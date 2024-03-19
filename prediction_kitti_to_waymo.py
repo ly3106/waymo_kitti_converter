@@ -1,4 +1,6 @@
-"""Adopted from waymo open dataset repository"""
+"""Adopted from waymo open dataset repository
+    <https://github.com/waymo-research/waymo-open-dataset/blob/v1.6.1/src/waymo_open_dataset/metrics/tools/create_prediction_file_example.py>`_.
+"""
 import os
 from os.path import join, isdir
 import tensorflow as tf
@@ -21,56 +23,6 @@ from waymo_open_dataset import dataset_pb2 as open_dataset
 # prefix = '1'
 #
 # NUM_PROC = 1
-
-# def _create_pd_file_example():
-#     """Creates a prediction objects file."""
-#     objects = metrics_pb2.Objects()
-#
-#     o = metrics_pb2.Object()
-#     # The following 3 fields are used to uniquely identify a frame a prediction
-#     # is predicted at. Make sure you set them to values exactly the same as what
-#     # we provided in the raw data. Otherwise your prediction is considered as a
-#     # false negative.
-#     o.context_name = ('context_name for the prediction. See Frame::context::name '
-#                       'in    dataset.proto.')
-#     # The frame timestamp for the prediction. See Frame::timestamp_micros in
-#     # dataset.proto.
-#     invalid_ts = -1
-#     o.frame_timestamp_micros = invalid_ts
-#     # This is only needed for 2D detection or tracking tasks.
-#     # Set it to the camera name the prediction is for.
-#     o.camera_name = dataset_pb2.CameraName.FRONT
-#
-#     # Populating box and score.
-#     box = label_pb2.Label.Box()
-#     box.center_x = 0
-#     box.center_y = 0
-#     box.center_z = 0
-#     box.length = 0
-#     box.width = 0
-#     box.height = 0
-#     box.heading = 0
-#     o.object.box.CopyFrom(box)
-#     # This must be within [0.0, 1.0]. It is better to filter those boxes with
-#     # small scores to speed up metrics computation.
-#     o.score = 0.5
-#     # For tracking, this must be set and it must be unique for each tracked
-#     # sequence.
-#     o.object.id = 'unique object tracking ID'
-#     # Use correct type.
-#     o.object.type = label_pb2.Label.TYPE_PEDESTRIAN
-#
-#     objects.objects.append(o)
-#
-#     # Add more objects. Note that a reasonable detector should limit its maximum
-#     # number of boxes predicted per frame. A reasonable value is around 400. A
-#     # huge number of boxes can slow down metrics computation.
-#
-#     # Write objects to a file.
-#     f = open('/tmp/your_preds.bin', 'wb')
-#     f.write(objects.SerializeToString())
-#     f.close()
-
 
 class KITTI2Waymo(object):
     def __init__(self, kitti_results_load_dir, waymo_tfrecords_load_dir,
@@ -162,7 +114,7 @@ class KITTI2Waymo(object):
 
         objects = metrics_pb2.Objects()
         with open(kitti_result_pathname, 'r') as f:
-            lines = f.readlines()
+            lines = [line for line in f.readlines() if line.strip()]
 
         for line in lines:
             o = parse_one_object(line)
@@ -196,8 +148,11 @@ class KITTI2Waymo(object):
 
             try:
                 objects = self.parse_objects(kitti_result_pathname, T_k2w, context_name, frame_timestamp_micros)
-            except:
+            except FileNotFoundError:
                 print(kitti_result_pathname, 'not found.')
+                objects = metrics_pb2.Objects()
+            except Exception as e:
+                print('An error occurred while parsing:', e)
                 objects = metrics_pb2.Objects()
 
             # print(file_num, frame_num, '\n', objects)
@@ -249,7 +204,7 @@ def main():
     parser.add_argument('waymo_results_save_dir', help='Directory to save temporary output files')
     parser.add_argument('waymo_results_comb_save_pathname', help='Pathname to save the single output file')
     parser.add_argument('--prefix', default='', help='Prefix to be added to converted file names')
-    parser.add_argument('--num_proc', default=1, help='Number of processes to spawn')
+    parser.add_argument('--num_proc', type=int, default=1, help='Number of processes to spawn')
     args = parser.parse_args()
 
     converter = KITTI2Waymo(args.kitti_results_load_dir,
